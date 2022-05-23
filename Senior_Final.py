@@ -27,14 +27,14 @@ from pykinect_azure.k4a import _k4atypes
 
 sys.path.insert(1, '../')
 folder_path = join(os.path.dirname(os.path.abspath(__file__)), "dataset")
-dataset_path = join(folder_path, "Demo4_rec")
+dataset_path = join(folder_path, "Demo1")
 
 warnings.filterwarnings("ignore")
 
-DIV = 4 # 0-4 (Division to start running code)
+DIV = 1 # 0-4 (Division to start running code)
 
 """""""""""""""""""""""""""""
-0 --> DAQ
+0 --> DAQ (ONLY WITH DEVICE!)
 1 --> Generate Pointcloud
 2 --> Pointcloud Processing and Reconstruction
 3 --> Surface Reconstruction & Filtering
@@ -1407,12 +1407,13 @@ def vis_text(text):
     cv2.imshow("Display",img)
 
     cv2.waitKey(2000)
-  
+
+ 
 if __name__ == "__main__":
 
     k4a_device, device_calibration = init_k4a()
 
-    if DIV < 1:
+    if DIV < 1 & MODE == "Device":
         vis_text("Process Start")
         get_key_poses_extraction(k4a_device)
         os.system('cls')
