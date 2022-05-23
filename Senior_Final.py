@@ -5,11 +5,13 @@ import re
 import shutil
 import sys
 import time
+import warnings
+import winsound
 from math import sqrt
 from multiprocessing import Process
 from os import listdir, makedirs
 from os.path import exists, isfile, join, splitext, isdir
-import warnings
+
 import cv2
 import matplotlib.pyplot as plt
 import mediapipe as mp
@@ -17,10 +19,8 @@ import numpy as np
 import open3d as o3d
 from cv2 import ROTATE_90_COUNTERCLOCKWISE
 from scipy.special import ellipe
-from sympy import FractionField, Symbol, Derivative, sympify
+from sympy import Symbol, Derivative, sympify
 from sympy.solvers import solve
-import time
-import winsound
 
 import pykinect_azure as pykinect
 from pykinect_azure.k4a import _k4atypes
@@ -31,7 +31,7 @@ dataset_path = join(folder_path, "Demo1")
 
 warnings.filterwarnings("ignore")
 
-DIV = 1 # 0-4 (Division to start running code)
+DIV = 1  # 0-4 (Division to start running code)
 
 """""""""""""""""""""""""""""
 0 --> DAQ (ONLY WITH DEVICE!)
@@ -66,6 +66,7 @@ DEBUG_PLOT = False
 
 Frequency = 1000
 Duration_Beep = 250
+
 
 ### File Handling Function  ###
 
@@ -589,8 +590,8 @@ def get_hip_dimension(pcd_front_np, pcd_back_np, pcd_side1_np, pcd_side2_np, pcd
         print("DIM@HIP - avg_width is {x} mm.".format(x=avg_width))
         print("DIM@HIP - avg_thick is {x} mm.".format(x=avg_thick))
         print("===========================================================================")
-        print("HIP_MEASUREMENT : THICKNESS = {x:.1f} cm".format(x=avg_thick/10))
-        
+        print("HIP_MEASUREMENT : THICKNESS = {x:.1f} cm".format(x=avg_thick / 10))
+
     return hip_y_avg, avg_width, avg_thick
 
 
@@ -659,7 +660,7 @@ class pcd_Pose():
             self.pcd_torso_part.colors = o3d.utility.Vector3dVector(torso_part_color_np)
 
             ### Get Head ###
-            y_threshold3 = (self.pcd_skel_np[12][1] + self.pcd_skel_np[0][1])/2
+            y_threshold3 = (self.pcd_skel_np[12][1] + self.pcd_skel_np[0][1]) / 2
             head_part_color_np = [self.pcd_colors_np[i] for i in range(pcd_count) if
                                   (self.pcd_points_np[i][1] > y_threshold3)]
 
@@ -785,10 +786,11 @@ def pcd_ellipse_plot(X, Y, x):
     ax.set_aspect('equal')
     ax.autoscale()
     plt.show()
-    
-    
+
+
 def ellipse_finder(np_pcd, offset, range=10,
-                   plane_to_project=1, is_plot = False):  # https://stackoverflow.com/questions/47873759/how-to-fit-a-2d-ellipse-to-given-points
+                   plane_to_project=1,
+                   is_plot=False):  # https://stackoverflow.com/questions/47873759/how-to-fit-a-2d-ellipse-to-given-points
     if plane_to_project == 1: projected_point = point_at_y(np_pcd, offset, range)
     if plane_to_project == 2: projected_point = point_at_z(np_pcd, offset, range)
 
@@ -813,23 +815,23 @@ def ellipse_finder(np_pcd, offset, range=10,
     return x  # coeff
 
 
-def measure_curve_human_part(pcd, y, range=10,is_plot = False):
-    a, b, c, d, e = ellipse_finder(pcd, y, range, plane_to_project=1 ,is_plot = is_plot) #coeff: f = -1
+def measure_curve_human_part(pcd, y, range=10, is_plot=False):
+    a, b, c, d, e = ellipse_finder(pcd, y, range, plane_to_project=1, is_plot=is_plot)  # coeff: f = -1
     # This shit is a real savior - https://math.stackexchange.com/questions/616645/determining-the-major-minor-axes-of-an-ellipse-from-general-form
     # The coefficient normalizing factor is given by:
-    q = 64*((-1*(4*a*c - b**2) - a*e**2 + b*d*e - c*d**2)/(4*a*c - b**2)**2)
+    q = 64 * ((-1 * (4 * a * c - b ** 2) - a * e ** 2 + b * d * e - c * d ** 2) / (4 * a * c - b ** 2) ** 2)
     # The distance between center and focal point is given by:
-    s = 0.25*sqrt(abs(q)*sqrt(b**2 + (a - c)**2))
-  
+    s = 0.25 * sqrt(abs(q) * sqrt(b ** 2 + (a - c) ** 2))
+
     # The semi-major axis length is given by:
-    major = float(0.125*sqrt(2*abs(q)*sqrt(b**2 + (a - c)**2) - 2*q*(a + c)))
+    major = float(0.125 * sqrt(2 * abs(q) * sqrt(b ** 2 + (a - c) ** 2) - 2 * q * (a + c)))
 
     # The semi-minor axis length is given by:
-    minor = float(sqrt(major**2 - s**2))
+    minor = float(sqrt(major ** 2 - s ** 2))
 
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.ellipe.html
-    e_sq = 1.0 - (minor**2/major**2)
-    p = 4*major*ellipe(e_sq)
+    e_sq = 1.0 - (minor ** 2 / major ** 2)
+    p = 4 * major * ellipe(e_sq)
 
     if DEBUG_MSG:
         print("\nMEASURE_CURVE")
@@ -866,16 +868,16 @@ def waist_measurement(pcd_np, pcd_skel_np, range=10):
 
     deriv = Derivative(eq, x).doit()
     critical = solve(deriv, x)[0]
-    peri = eq.subs(x, critical).evalf() # milimeter
-    
+    peri = eq.subs(x, critical).evalf()  # milimeter
+
     if DEBUG_MSG: print("\nWAIST_MEAS : eq = {x}".format(x=eq))
     if DEBUG_MSG: print("WAIST_MEAS : deriv = {x}".format(x=deriv))
     if DEBUG_MSG: print("WAIST_MEAS : critical = {x}".format(x=critical))
     if DEBUG_MSG: print("WAIST_MEASUREMENT : Perimeter = {x:.1f} in".format(x=peri / 25.4))
-    
-    if DEBUG_PLOT: p  = measure_curve_human_part(pcd_np, critical, range, is_plot=True)
 
-    return peri/25.4
+    if DEBUG_PLOT: p = measure_curve_human_part(pcd_np, critical, range, is_plot=True)
+
+    return peri / 25.4
 
 
 def hip_measurement(pcd_np, pcd_skel_np, range=10):
@@ -892,8 +894,8 @@ def hip_measurement(pcd_np, pcd_skel_np, range=10):
 
     while (y < y_stop):
         p = measure_curve_human_part(pcd_np, y, range)
-        if p>peri :
-            peri =  p
+        if p > peri:
+            peri = p
             y_pmax = y
 
         if DEBUG_MSG: print("HIP_MEAS : p = {x:} in".format(x=p / 25.4))
@@ -902,13 +904,12 @@ def hip_measurement(pcd_np, pcd_skel_np, range=10):
 
     if DEBUG_MSG: print("HIP_MEASUREMENT : Perimeter = {x:.1f} in".format(x=peri / 25.4))
 
-    if DEBUG_PLOT: p  = measure_curve_human_part(pcd_np, y_pmax, range, is_plot=True)
-    
-    return peri/25.4
+    if DEBUG_PLOT: p = measure_curve_human_part(pcd_np, y_pmax, range, is_plot=True)
+
+    return peri / 25.4
 
 
 def measure_head_part(pcd, pcd_skel, range=10):
-
     Head_z_avg = (pcd_skel[11][2] + pcd_skel[12][2]) / 2 - 30
 
     a, b, c, d, e = ellipse_finder(pcd, Head_z_avg, range, plane_to_project=2)  # coeff: f = -1
@@ -921,8 +922,8 @@ def measure_head_part(pcd, pcd_skel, range=10):
 
     # The semi-major axis length is given by:
     major = float(0.125 * sqrt(2 * abs(q) * sqrt(b ** 2 + (a - c) ** 2) - 2 * q * (a + c)))
-    if major**2 - s**2 < 0:
-         return None
+    if major ** 2 - s ** 2 < 0:
+        return None
     # The semi-minor axis length is given by:
     minor = float(sqrt(major ** 2 - s ** 2))
 
@@ -944,14 +945,15 @@ def measure_head_part(pcd, pcd_skel, range=10):
 def measure_human_height(pcd, pcd_skel, head_length):
     full_body_Pose = pcd_Pose(pcd, pcd_skel)
     landmark_xyz = full_body_Pose.pcd_skel_np
-    
-    highest_pc,lowest_pc = bound_at_x(full_body_Pose.pcd_points_np, (landmark_xyz[11][0]+landmark_xyz[12][0])/2,range = 5000)
+
+    highest_pc, lowest_pc = bound_at_x(full_body_Pose.pcd_points_np, (landmark_xyz[11][0] + landmark_xyz[12][0]) / 2,
+                                       range=5000)
     height_highestwithlowest = highest_pc - lowest_pc
-    
+
     if head_length != None:
         # height_fromhead = head_length*(1/2)+(landmark_xyz[2][1]+landmark_xyz[5][1])/2- lowest_pc
-        height_fromhead = head_length+(landmark_xyz[12][1] + landmark_xyz[0][1])/2- lowest_pc
-        
+        height_fromhead = head_length + (landmark_xyz[12][1] + landmark_xyz[0][1]) / 2 - lowest_pc
+
         final_height = max(height_highestwithlowest, height_fromhead)
         if DEBUG_MSG: print("HEIGHT_MEASUREMENT : Height = {x:.1f} cm".format(x=final_height / 10))
         if DEBUG_MSG: print("HEIGHT_MEASUREMENT(MAX-MIN) : Height = {x:.1f} cm".format(x=height_highestwithlowest / 10))
@@ -959,9 +961,10 @@ def measure_human_height(pcd, pcd_skel, head_length):
     else:
         final_height = height_highestwithlowest
         if DEBUG_MSG: print("HEIGHT_MEASUREMENT : Height = {x:.1f} cm".format(x=final_height / 10))
-        
+
     final_height = height_highestwithlowest
-    return final_height/10
+    return final_height / 10
+
 
 ### Main Function ###
 
@@ -1016,11 +1019,11 @@ def get_key_poses_extraction(device):
     start_clock = False
     key_pose_mode = 1
     cv2.namedWindow("Captured Image", cv2.WINDOW_AUTOSIZE)
-    blank_img = np.zeros((300,300,4), dtype=np.uint8) 
-    white_img = np.ones((300,300,4), dtype=np.uint8) * 255
+    blank_img = np.zeros((300, 300, 4), dtype=np.uint8)
+    white_img = np.ones((300, 300, 4), dtype=np.uint8) * 255
     list2d = [[blank_img, white_img], [white_img, blank_img]]
-    result_img = concat_vh(list2d, (300,300))
-    cv2.imshow("Captured Image", result_img )
+    result_img = concat_vh(list2d, (300, 300))
+    cv2.imshow("Captured Image", result_img)
 
     while True:
         ### Check if the playback is EOF ###
@@ -1083,12 +1086,12 @@ def get_key_poses_extraction(device):
                     start_clock = False
                     key_poses_list[0] = [
                         depth_image, modified_rgb_image, skel_position, segmentation_mask]
-                    
-                    modified_rgb_image1 = cv2.resize(modified_rgb_image,(300,300))
+
+                    modified_rgb_image1 = cv2.resize(modified_rgb_image, (300, 300))
                     list2d = [[modified_rgb_image1, white_img], [white_img, blank_img]]
-                    result_img = concat_vh(list2d, (300,300))
-                    cv2.imshow("Captured Image", result_img )
-                    winsound.Beep(Frequency,Duration_Beep)
+                    result_img = concat_vh(list2d, (300, 300))
+                    cv2.imshow("Captured Image", result_img)
+                    winsound.Beep(Frequency, Duration_Beep)
                     length_max = detector.findDistance(
                         modified_rgb_image, 11, 12, draw=IS_DRAW_EFFECT)
                     # print(length_max)
@@ -1114,12 +1117,12 @@ def get_key_poses_extraction(device):
                         start_clock = False
                         key_poses_list[1] = [
                             depth_image, modified_rgb_image, skel_position, segmentation_mask]
-                        modified_rgb_image2 = cv2.resize(modified_rgb_image,(300,300))
+                        modified_rgb_image2 = cv2.resize(modified_rgb_image, (300, 300))
                         list2d = [[modified_rgb_image1, modified_rgb_image2], [white_img, blank_img]]
-                        result_img = concat_vh(list2d, (300,300))
-                        cv2.imshow("Captured Image", result_img )
-                        winsound.Beep(Frequency,Duration_Beep)
-                        
+                        result_img = concat_vh(list2d, (300, 300))
+                        cv2.imshow("Captured Image", result_img)
+                        winsound.Beep(Frequency, Duration_Beep)
+
                         key_pose_mode += 1
 
                     elif abs(length_ex - length) / 100 > 0.1:
@@ -1144,11 +1147,11 @@ def get_key_poses_extraction(device):
                     start_clock = False
                     key_poses_list[2] = [
                         depth_image, modified_rgb_image, skel_position, segmentation_mask]
-                    modified_rgb_image3 = cv2.resize(modified_rgb_image,(300,300))
+                    modified_rgb_image3 = cv2.resize(modified_rgb_image, (300, 300))
                     list2d = [[modified_rgb_image1, modified_rgb_image2], [modified_rgb_image3, blank_img]]
-                    result_img = concat_vh(list2d, (300,300))
-                    cv2.imshow("Captured Image", result_img )
-                    winsound.Beep(Frequency,Duration_Beep)
+                    result_img = concat_vh(list2d, (300, 300))
+                    cv2.imshow("Captured Image", result_img)
+                    winsound.Beep(Frequency, Duration_Beep)
                     key_pose_mode += 1
                 elif abs(angle2_ex - angle2) > 5 or abs(angle1_ex - angle1) > 5:
                     start_clock = False
@@ -1169,12 +1172,13 @@ def get_key_poses_extraction(device):
                         start_clock = False
                         key_poses_list[3] = [
                             depth_image, modified_rgb_image, skel_position, segmentation_mask]
-                        modified_rgb_image4 = cv2.resize(modified_rgb_image,(300,300))
-                        list2d = [[modified_rgb_image1, modified_rgb_image2], [modified_rgb_image3, modified_rgb_image4]]
-                        result_img = concat_vh(list2d, (300,300))
-                        cv2.imshow("Captured Image", result_img )
-                        winsound.Beep(Frequency,Duration_Beep*6)
-                        
+                        modified_rgb_image4 = cv2.resize(modified_rgb_image, (300, 300))
+                        list2d = [[modified_rgb_image1, modified_rgb_image2],
+                                  [modified_rgb_image3, modified_rgb_image4]]
+                        result_img = concat_vh(list2d, (300, 300))
+                        cv2.imshow("Captured Image", result_img)
+                        winsound.Beep(Frequency, Duration_Beep * 6)
+
                         key_pose_mode += 1
 
                     elif abs(length_ex - length) / 100 > 0.1:
@@ -1189,9 +1193,9 @@ def get_key_poses_extraction(device):
         cv2.imshow('Image', img_tile)
 
         ##### Press q key to stop ####
-        if (cv2.waitKey(1) & 0xFF == ord('q')) :
+        if (cv2.waitKey(1) & 0xFF == ord('q')):
             sys.exit()
-        if key_pose_mode == 5 :
+        if key_pose_mode == 5:
             break
 
     device.close()
@@ -1369,46 +1373,50 @@ def gui_result(waist, hip, height):
     img = cv2.imread("GUI_NEW.png")
 
     cv2.imshow("Measurement Result", img)
-    cv2.putText(img, "{:.1f}".format(waist)+" in", (500, 418), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 255, 255), thickness=1) 
-    cv2.putText(img, "{:.1f}".format(hip)+" in", (500, 478), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 255, 255), thickness=1) 
-    cv2.putText(img, "{:.1f}".format(height)+" cm", (485, 548), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 255, 255), thickness=1) 
+    cv2.putText(img, "{:.1f}".format(waist) + " in", (500, 418), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 255, 255),
+                thickness=1)
+    cv2.putText(img, "{:.1f}".format(hip) + " in", (500, 478), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 255, 255),
+                thickness=1)
+    cv2.putText(img, "{:.1f}".format(height) + " cm", (485, 548), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 255, 255),
+                thickness=1)
 
     cv2.imshow("Measurement Result", img)
     cv2.waitKey(0)
 
 
 def measure_human_part(full_body_pcd):
-    full_body_Pose = pcd_Pose(full_body_pcd[2], full_body_pcd[1]) 
+    full_body_Pose = pcd_Pose(full_body_pcd[2], full_body_pcd[1])
 
     full_body_Pose.get_human_part_decomposition()
 
     hip_perimeter = hip_measurement(full_body_Pose.pcd_points_np, full_body_Pose.pcd_skel_np, range=10)
     waist_perimeter = waist_measurement(full_body_Pose.pcd_points_np, full_body_Pose.pcd_skel_np, range=10)
 
-    head_length= measure_head_part(np.asarray(full_body_Pose.pcd_head_part.points), full_body_Pose.pcd_skel_np, range=25)
+    head_length = measure_head_part(np.asarray(full_body_Pose.pcd_head_part.points), full_body_Pose.pcd_skel_np,
+                                    range=25)
     height = measure_human_height(full_body_pcd[2], full_body_pcd[1], head_length)
 
     vis = init_pointcloud_visualizer()
     vis.add_geometry(full_body_Pose.pcd)
     vis.run()
     vis.destroy_window()
-    
+
     if GUI: gui_result(waist_perimeter, hip_perimeter, height)
 
 
 def vis_text(text):
-    img = np.zeros((100,300,3), dtype=np.uint8)
-    cv2.putText(img, text, (20, 50), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 255, 255), thickness=1) 
+    img = np.zeros((100, 300, 3), dtype=np.uint8)
+    cv2.putText(img, text, (20, 50), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 255, 255), thickness=1)
 
-    cv2.imshow("Display",img)
+    cv2.imshow("Display", img)
     cv2.waitKey(2000)
 
-    img = np.zeros((100,300,3), dtype=np.uint8)
-    cv2.imshow("Display",img)
+    img = np.zeros((100, 300, 3), dtype=np.uint8)
+    cv2.imshow("Display", img)
 
     cv2.waitKey(2000)
 
- 
+
 if __name__ == "__main__":
 
     k4a_device, device_calibration = init_k4a()
@@ -1418,7 +1426,7 @@ if __name__ == "__main__":
         get_key_poses_extraction(k4a_device)
         os.system('cls')
         vis_text("Capture Complete")
-        
+
     if DIV < 2:
         key_poses_list = np.load(
             join(dataset_path, "dataset.npy"), allow_pickle=True)
@@ -1447,6 +1455,6 @@ if __name__ == "__main__":
         measure_human_part(full_body_pcd)
         os.system('cls')
         vis_text("Process Complete")
-        
+
     cv2.waitKey(0)
     cv2.destroyAllWindows()
